@@ -22,6 +22,7 @@
 - Fixed links to stripe dashboard when in live mode. ([#21](https://github.com/craftcms/stripe/pull/21))
 - Fixed an error that could occur when syncing Customer and Payment Method data. ([#29](https://github.com/craftcms/stripe/pull/29))
 - Fixed an error that could occur when sorting Invoices table by certain columns. ([#31](https://github.com/craftcms/stripe/pull/31))
+- Fixed an error that could occur when trying to view elements as cards. ([#15](https://github.com/craftcms/stripe/pull/15))
 - Stripe now requires Craft CMS 5.3.0 or later. ([#26](https://github.com/craftcms/stripe/pull/26))
 
 ## 1.1.0 - 2024-06-14
