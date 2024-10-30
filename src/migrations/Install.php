@@ -141,6 +141,16 @@ class Install extends Migration
             'uid' => $this->string(),
         ]);
 
+        $this->archiveTableIfExists(Table::WEBHOOKS);
+        $this->createTable(Table::WEBHOOKS, [
+            'id' => $this->primaryKey(),
+            'webhookSigningSecret' => $this->string()->notNull(),
+            'webhookId' => $this->string()->notNull(),
+            'dateCreated' => $this->dateTime()->notNull(),
+            'dateUpdated' => $this->dateTime()->notNull(),
+            'uid' => $this->string(),
+        ]);
+
         // create generated columns
         $this->createGeneratedColumns();
     }
@@ -183,7 +193,7 @@ class Install extends Migration
         // latestInvoiceId
         $this->execute("ALTER TABLE " . Table::SUBSCRIPTIONDATA . " ADD COLUMN " .
             $db->quoteColumnName('latestInvoiceId') . " VARCHAR(255) GENERATED ALWAYS AS (" .
-            $qb->jsonExtract('data', ['latest_invoice']) . ") STORED;");
+            $qb->jsonExtract('data', ['latest_invoice']) . ") STORED NULL;");
         // startDate
         $this->execute("ALTER TABLE " . Table::SUBSCRIPTIONDATA . " ADD COLUMN " .
             $db->quoteColumnName('startDate') . " VARCHAR(255) GENERATED ALWAYS AS (" .
@@ -232,7 +242,7 @@ class Install extends Migration
 
         $this->createIndex(null, Table::SUBSCRIPTIONDATA, ['stripeId'], true);
         $this->createIndex(null, Table::SUBSCRIPTIONDATA, ['customerId']);
-        $this->createIndex(null, Table::SUBSCRIPTIONDATA, ['latestInvoiceId'], true);
+        $this->createIndex(null, Table::SUBSCRIPTIONDATA, ['latestInvoiceId']);
 
         $this->createIndex(null, Table::CUSTOMERDATA, ['stripeId'], true);
         $this->createIndex(null, Table::CUSTOMERDATA, ['email']);
