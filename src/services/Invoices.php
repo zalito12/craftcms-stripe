@@ -58,11 +58,21 @@ class Invoices extends Component
         $api = Plugin::getInstance()->getApi();
         $invoices = $api->fetchAllInvoices();
 
+        $stripeIds = [];
+
         $count = 0;
         foreach ($invoices as $invoice) {
+            $stripeIds[] = $invoice->id;
             if ($this->createOrUpdateInvoice($invoice)) {
                 $count++;
             }
+        }
+
+        // Delete non existent invoices
+        $invoiceDataRecord = InvoiceDataRecord::find()->where(['not in', 'stripeId', $stripeIds])->all();
+        
+        foreach ($invoiceDataRecord as $record) {
+            $record->delete();
         }
 
         return $count;

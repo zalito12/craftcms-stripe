@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://craftcms.com/
  * @copyright Copyright (c) Pixel & Tonic, Inc.
@@ -57,11 +58,21 @@ class Customers extends Component
         $api = Plugin::getInstance()->getApi();
         $customers = $api->fetchAllCustomers();
 
+        $stripeIds = [];
+
         $count = 0;
         foreach ($customers as $customer) {
+            $stripeIds[] = $customer->id;
             if ($this->createOrUpdateCustomer($customer)) {
                 $count++;
             }
+        }
+
+        // Delete non existent customers
+        $customerDataRecord = CustomerDataRecord::find()->where(['not in', 'stripeId', $stripeIds])->all();
+        
+        foreach ($customerDataRecord as $record) {
+            $record->delete();
         }
 
         return $count;
