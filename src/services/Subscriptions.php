@@ -12,7 +12,6 @@ use craft\events\ConfigEvent;
 use craft\helpers\Json;
 use craft\helpers\ProjectConfig;
 use craft\models\FieldLayout;
-use craft\stripe\elements\Subscription;
 use craft\stripe\elements\Subscription as SubscriptionElement;
 use craft\stripe\events\StripeSubscriptionSyncEvent;
 use craft\stripe\Plugin;
@@ -62,7 +61,7 @@ class Subscriptions extends Component
 
         $iterator = $api->fetchAllIterator('subscriptions', [
             'status' => 'all',
-            'expand' => $api->prepExpandForFetchAll(Subscription::$expandParams),
+            'expand' => $api->prepExpandForFetchAll(SubscriptionElement::$expandParams),
         ]);
 
         $stripeIds = [];

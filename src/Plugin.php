@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @link https://craftcms.com/
  * @copyright Copyright (c) Pixel & Tonic, Inc.
@@ -40,12 +41,14 @@ use craft\stripe\elements\conditions\users\HasStripeCustomerConditionRule;
 use craft\stripe\elements\Price;
 use craft\stripe\elements\Product;
 use craft\stripe\elements\Subscription;
+use craft\stripe\events\StripeEvent;
 use craft\stripe\fieldlayoutelements\PricesField;
 use craft\stripe\fields\Products as ProductsField;
 use craft\stripe\fields\Subscriptions as SubscriptionsField;
 use craft\stripe\jobs\SyncData;
 use craft\stripe\linktypes\Product as ProductLinkType;
 use craft\stripe\models\Settings;
+use craft\stripe\records\CustomerData;
 use craft\stripe\services\Api;
 use craft\stripe\services\BillingPortal;
 use craft\stripe\services\Checkout;
@@ -140,6 +143,66 @@ class Plugin extends BasePlugin
     public function init()
     {
         parent::init();
+
+        Event::on(
+            Webhooks::class,
+            Webhooks::EVENT_STRIPE_EVENT,
+            function (StripeEvent $event) {
+                $stripeEvent = $event->stripeEvent;
+                $eventObject = $stripeEvent->data->object;
+                // process the event based on its type
+                switch ($stripeEvent->type) {
+                    case 'customer.subscription.created':
+                    case 'customer.subscription.updated':
+                    case 'customer.subscription.paused':
+                    case 'customer.subscription.resumed':
+                    case 'customer.subscription.pending_update_applied':
+                    case 'customer.subscription.pending_update_expired':
+                    case 'customer.subscription.deleted':
+                        Craft::warning('[GONZALO] Event Object');
+                        Craft::warning(print_r($eventObject, true));
+                        Craft::warning('[GONZALO] Product');
+                        Craft::warning($eventObject->plan->product);
+                        $product = Product::find()->stripeId($eventObject->plan->product)->one();
+                        Craft::warning($product->groupHandle);
+                        Craft::warning(print_r($product, true));
+                        Craft::warning($product->groupHandle);
+                        Craft::warning('[GONZALO] Customer');
+                        Craft::warning($eventObject->customer);
+                        $customer = CustomerData::find()->where(['stripeId' => $eventObject->customer])->one();
+                        Craft::warning($customer->email);
+                        Craft::warning(print_r($customer, true));
+
+                        $user = User::find()->email($customer->email)->exists();
+                        if (! $user) {
+                            $user = new User();
+                            $user->pending = true;
+                            $user->username = $customer->email;
+                            $user->fullName = $customer->data['name'];
+                            $user->email = $customer->email;
+                            $user->passwordResetRequired = false;
+                            $user->validate(null, false);
+                            Craft::$app->getElements()->saveElement($user, false);
+
+                            $userGroup = Craft::$app->userGroups->getGroupByHandle($product->groupHandle);
+                            if ( $userGroup ) {
+                                Craft::$app->users->assignUserToGroups($user->id, $userGroup->id);
+                            }
+                            Craft::$app->getUsers()->sendActivationEmail($user);
+                        }
+
+                        Craft::warning('[GONZALO] Sub');
+                        //$subscription = $this->getApi()->fetchSubscriptionById($eventObject->id);
+                        $subscriptionElement = Subscription::find()->stripeId($eventObject->id)->one();
+                        Craft::warning(print_r($subscriptionElement, true));
+                        break;
+                    default;
+                        //Craft::warning('[GONZALO] Default');
+                        //Craft::warning(print_r($eventObject, true));
+                        break;
+                }
+            }
+        );
 
         $this->registerBehaviors();
         $this->registerElementTypes();
@@ -331,7 +394,7 @@ class Plugin extends BasePlugin
         Event::on(
             Utilities::class,
             Utilities::EVENT_REGISTER_UTILITIES,
-            function(RegisterComponentTypesEvent $event) {
+            function (RegisterComponentTypesEvent $event) {
                 $event->types[] = Sync::class;
             }
         );
@@ -344,7 +407,7 @@ class Plugin extends BasePlugin
      */
     private function registerElementTypes(): void
     {
-        Event::on(Elements::class, Elements::EVENT_REGISTER_ELEMENT_TYPES, function(RegisterComponentTypesEvent $event) {
+        Event::on(Elements::class, Elements::EVENT_REGISTER_ELEMENT_TYPES, function (RegisterComponentTypesEvent $event) {
             $event->types[] = Product::class;
             $event->types[] = Price::class;
             $event->types[] = Subscription::class;
@@ -353,16 +416,16 @@ class Plugin extends BasePlugin
 
     private function registerUserEditScreens(): void
     {
-        Event::on(UsersController::class, UsersController::EVENT_DEFINE_EDIT_SCREENS, function(DefineEditUserScreensEvent $event) {
+        Event::on(UsersController::class, UsersController::EVENT_DEFINE_EDIT_SCREENS, function (DefineEditUserScreensEvent $event) {
             $event->screens['stripe'] = [
                 'label' => Craft::t('stripe', 'Stripe'),
             ];
         });
 
-        Event::on(User::class, User::EVENT_DEFINE_METADATA, function(DefineMetadataEvent $event) {
-            $event->metadata[Craft::t('stripe', 'Stripe Customer(s)')] = function() use ($event) {
+        Event::on(User::class, User::EVENT_DEFINE_METADATA, function (DefineMetadataEvent $event) {
+            $event->metadata[Craft::t('stripe', 'Stripe Customer(s)')] = function () use ($event) {
                 return Html::beginTag('div') .
-                    $event->sender->getStripeCustomers()->reduce(function($carry, $item) {
+                    $event->sender->getStripeCustomers()->reduce(function ($carry, $item) {
                         $carry = is_string($carry) ? $carry : '';
                         $carry .=
                             Html::beginTag('div') .
@@ -387,7 +450,7 @@ class Plugin extends BasePlugin
      */
     private function registerFieldTypes(): void
     {
-        Event::on(Fields::class, Fields::EVENT_REGISTER_FIELD_TYPES, static function(RegisterComponentTypesEvent $event) {
+        Event::on(Fields::class, Fields::EVENT_REGISTER_FIELD_TYPES, static function (RegisterComponentTypesEvent $event) {
             $event->types[] = ProductsField::class;
             $event->types[] = SubscriptionsField::class;
         });
@@ -398,7 +461,7 @@ class Plugin extends BasePlugin
      */
     private function registerLinkTypes(): void
     {
-        Event::on(Link::class, Link::EVENT_REGISTER_LINK_TYPES, function(RegisterComponentTypesEvent $event) {
+        Event::on(Link::class, Link::EVENT_REGISTER_LINK_TYPES, function (RegisterComponentTypesEvent $event) {
             $event->types[] = ProductLinkType::class;
         });
     }
@@ -410,7 +473,7 @@ class Plugin extends BasePlugin
      */
     private function registerFieldLayoutElements(): void
     {
-        Event::on(FieldLayout::class, FieldLayout::EVENT_DEFINE_NATIVE_FIELDS, function(DefineFieldLayoutFieldsEvent $event) {
+        Event::on(FieldLayout::class, FieldLayout::EVENT_DEFINE_NATIVE_FIELDS, function (DefineFieldLayoutFieldsEvent $event) {
             /** @var FieldLayout $fieldLayout */
             $fieldLayout = $event->sender;
 
@@ -427,7 +490,7 @@ class Plugin extends BasePlugin
      */
     private function registerVariables(): void
     {
-        Event::on(CraftVariable::class, CraftVariable::EVENT_INIT, static function(Event $event) {
+        Event::on(CraftVariable::class, CraftVariable::EVENT_INIT, static function (Event $event) {
             $variable = $event->sender;
             $variable->attachBehavior('stripe', CraftVariableBehavior::class);
         });
@@ -444,9 +507,9 @@ class Plugin extends BasePlugin
 
     public function registerResaveCommands(): void
     {
-        Event::on(ResaveController::class, Controller::EVENT_DEFINE_ACTIONS, static function(DefineConsoleActionsEvent $e) {
+        Event::on(ResaveController::class, Controller::EVENT_DEFINE_ACTIONS, static function (DefineConsoleActionsEvent $e) {
             $e->actions['stripe-products'] = [
-                'action' => function(): int {
+                'action' => function (): int {
                     /** @var ResaveController $controller */
                     $controller = Craft::$app->controller;
                     return $controller->resaveElements(Product::class);
@@ -456,7 +519,7 @@ class Plugin extends BasePlugin
             ];
 
             $e->actions['stripe-prices'] = [
-                'action' => function(): int {
+                'action' => function (): int {
                     /** @var ResaveController $controller */
                     $controller = Craft::$app->controller;
                     return $controller->resaveElements(Price::class);
@@ -466,7 +529,7 @@ class Plugin extends BasePlugin
             ];
 
             $e->actions['stripe-subscriptions'] = [
-                'action' => function(): int {
+                'action' => function (): int {
                     /** @var ResaveController $controller */
                     $controller = Craft::$app->controller;
                     return $controller->resaveElements(Subscription::class);
@@ -484,7 +547,7 @@ class Plugin extends BasePlugin
      */
     private function registerCpRoutes(): void
     {
-        Event::on(UrlManager::class, UrlManager::EVENT_REGISTER_CP_URL_RULES, function(RegisterUrlRulesEvent $event) {
+        Event::on(UrlManager::class, UrlManager::EVENT_REGISTER_CP_URL_RULES, function (RegisterUrlRulesEvent $event) {
             $event->rules['stripe'] = ['template' => 'stripe/_index'];
 
             $event->rules['stripe/settings'] = 'stripe/settings';
@@ -509,7 +572,7 @@ class Plugin extends BasePlugin
      */
     private function registerSiteRoutes(): void
     {
-        Event::on(UrlManager::class, UrlManager::EVENT_REGISTER_SITE_URL_RULES, function(RegisterUrlRulesEvent $event) {
+        Event::on(UrlManager::class, UrlManager::EVENT_REGISTER_SITE_URL_RULES, function (RegisterUrlRulesEvent $event) {
             $event->rules['stripe/webhooks/handle'] = 'stripe/webhooks/handle';
         });
     }
@@ -522,7 +585,7 @@ class Plugin extends BasePlugin
         Event::on(
             User::class,
             User::EVENT_DEFINE_BEHAVIORS,
-            function(DefineBehaviorsEvent $event) {
+            function (DefineBehaviorsEvent $event) {
                 $event->behaviors['stripe:customer'] = StripeCustomerBehavior::class;
             }
         );
@@ -536,7 +599,7 @@ class Plugin extends BasePlugin
         Event::on(
             UserCondition::class,
             UserCondition::EVENT_REGISTER_CONDITION_RULES,
-            function(RegisterConditionRulesEvent $event) {
+            function (RegisterConditionRulesEvent $event) {
                 $event->conditionRules[] = HasStripeCustomerConditionRule::class;
             }
         );
@@ -547,7 +610,7 @@ class Plugin extends BasePlugin
         Event::on(
             User::class,
             Element::EVENT_DEFINE_ACTION_MENU_ITEMS,
-            function(DefineMenuItemsEvent $event) {
+            function (DefineMenuItemsEvent $event) {
                 $sender = $event->sender;
                 if ($email = $sender->email) {
                     $customers = Plugin::getInstance()->getApi()->fetchAllCustomers(['email' => $email]);
@@ -575,7 +638,7 @@ class Plugin extends BasePlugin
     private function handleUserElementChanges(): void
     {
         // if email address got changed - update stripe
-        Event::on(UserRecord::class, UserRecord::EVENT_BEFORE_UPDATE, function(ModelEvent $event) {
+        Event::on(UserRecord::class, UserRecord::EVENT_BEFORE_UPDATE, function (ModelEvent $event) {
             $userRecord = $event->sender;
             /** @var User|StripeCustomerBehavior $user */
             $user = Craft::$app->getUsers()->getUserById($userRecord->id);
@@ -602,7 +665,7 @@ class Plugin extends BasePlugin
 
         // if user is saved, and they have an email address and exist in stripe, but we don't have their stripe customer data
         // kick off queue job to sync customer-related data
-        Event::on(User::class, User::EVENT_AFTER_SAVE, function(ModelEvent $event) {
+        Event::on(User::class, User::EVENT_AFTER_SAVE, function (ModelEvent $event) {
             /** @var User|StripeCustomerBehavior $user */
             $user = $event->sender;
 
