@@ -1,6 +1,6 @@
 # Release Notes for Stripe
 
-## Unreleased
+## 1.2.0 - 2024-11-06
 
 > [!NOTE]
 > The plugin now requires the `customer.updated` webhook event to be registered. Update the webhook registration in Stripe, or re-register the webhook handler in the plugin settings.
