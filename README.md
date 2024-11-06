@@ -4,7 +4,7 @@ Connect your Craft content to [Stripe](https://stripe.com)’s powerful billing 
 
 ## Requirements
 
-This plugin requires Craft CMS 5.1.0 or later, and a Stripe account with access to developer features.
+This plugin requires Craft CMS 5.3.0 or later, and a Stripe account with access to developer features.
 
 > [!TIP]
 > Transitioning from Craft Commerce? Check out the dedicated [migration](#migrating-from-commerce) section.
