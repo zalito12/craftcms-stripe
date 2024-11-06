@@ -6,8 +6,7 @@
 > The plugin now requires the `customer.updated` webhook event to be registered. Update the webhook registration in Stripe, or re-register the webhook handler in the plugin settings.
 
 - Stripe now requires Craft CMS 5.3.0 or later. ([#26](https://github.com/craftcms/stripe/pull/26))
-- The webhook handler now listens for `customer.updated` events.
-- It’s now possible to manually sync Stripe customer data from Edit User pages. ([#21](https://github.com/craftcms/stripe/pull/21))
+- It’s now possible to manually sync Stripe customer data from Edit User pages (requires the `customer.updated` Stripe webhook event to be registered). ([#21](https://github.com/craftcms/stripe/pull/21))
 - Added support for selecting Stripe products in Link fields. ([#26](https://github.com/craftcms/stripe/pull/26))
 - Added the “Stripe Subscriptions” field type. ([#32](https://github.com/craftcms/stripe/pull/32))
 - It’s now possible to set custom field values on subscriptions during checkout. ([#25](https://github.com/craftcms/stripe/issues/25))
