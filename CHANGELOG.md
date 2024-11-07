@@ -1,5 +1,9 @@
 # Release Notes for Stripe
 
+## 1.2.0.1 - 2024-11-07
+
+- Fixed an infinite loop that could occur when querying for a user.
+
 ## 1.2.0 - 2024-11-06
 
 > [!NOTE]
